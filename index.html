@@ -22,6 +22,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 6px;
 .amount{text-align:right;font-weight:700}.delete{background:#fee2e2;color:#991b1b;padding:7px 9px;width:auto}
 .category-row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #eee}.bar{height:7px;background:#e5e7eb;border-radius:99px;margin-top:5px;overflow:hidden}.fill{height:100%;background:#111827}
 .empty{text-align:center;color:#6b7280;padding:20px}
+.total-highlight{font-size:28px;font-weight:800;margin-top:10px}.small-note{color:#6b7280;font-size:12px;margin-top:3px}
 @media(max-width:600px){.cards{grid-template-columns:1fr 1fr}.cards .card:last-child{grid-column:1/-1}.grid{grid-template-columns:1fr}table{font-size:12px}th:nth-child(3),td:nth-child(3){display:none}}
 </style>
 </head>
@@ -36,8 +37,10 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 6px;
     <div id="loginError" style="color:#b91c1c;font-size:12px;margin-top:10px;display:none">Şifre yanlış.</div>
   </div>
 </div>
+
 <header><h1>💰 Dükkan Gider Takip</h1><div class="sub">Giderlerini kaydet, aylık ve kategori bazında takip et.</div></header>
 <main>
+
 <section class="cards">
 <div class="card"><div class="label">Bu Ay</div><div class="value" id="monthTotal">₺0</div></div>
 <div class="card"><div class="label">Bu Yıl</div><div class="value" id="yearTotal">₺0</div></div>
@@ -70,8 +73,24 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 6px;
 </section>
 
 <section class="panel">
-<h2>Gider Dağılımı</h2>
+<h2>Gider Dağılımı — Seçilen Ay</h2>
 <div id="categoryReport"></div>
+</section>
+
+<section class="panel">
+<h2>📊 Geçmişten Bugüne Kategori Toplamları</h2>
+<div id="allTimeCategoryReport"></div>
+</section>
+
+<section class="panel">
+<h2>🔎 Kategori Geçmişi</h2>
+<label>Kategori seç</label>
+<select id="categorySelect" onchange="renderCategoryHistory()">
+<option value="">Kategori seç...</option>
+</select>
+<div id="categoryHistoryTotal" class="total-highlight">₺0</div>
+<div class="small-note">Seçilen kategorinin geçmişten bugüne toplam gideri</div>
+<div id="categoryHistory"></div>
 </section>
 
 <section class="panel">
@@ -103,6 +122,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 6px;
 <script>
 const KEY="dukkan_giderleri_v1";
 const PASS_KEY="dukkan_gider_sifre_v1";
+
 function login(){
  const entered=document.getElementById("loginPassword").value;
  const saved=localStorage.getItem(PASS_KEY);
@@ -122,6 +142,7 @@ function login(){
    document.getElementById("loginError").style.display="block";
  }
 }
+
 function resetPasswordSetup(){
  if(confirm("Şifre sıfırlanacak. Gider kayıtların SİLİNMEYECEK. Devam edilsin mi?")){
    localStorage.removeItem(PASS_KEY);
@@ -131,59 +152,148 @@ function resetPasswordSetup(){
    document.getElementById("loginError").style.display="block";
  }
 }
+
 document.getElementById("loginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
-if(localStorage.getItem(PASS_KEY)){}
+
 let expenses=JSON.parse(localStorage.getItem(KEY)||"[]");
 const months=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 const money=n=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:2}).format(n);
+
 function save(){localStorage.setItem(KEY,JSON.stringify(expenses))}
 function today(){return new Date().toISOString().slice(0,10)}
 document.getElementById("date").value=today();
+
 const now=new Date(), thisYear=now.getFullYear(), thisMonth=now.getMonth();
-for(let y=thisYear-3;y<=thisYear+3;y++){let o=document.createElement("option");o.value=y;o.textContent=y;document.getElementById("reportYear").appendChild(o)}
-document.getElementById("reportYear").value=thisYear; document.getElementById("reportMonth").value=thisMonth;
+for(let y=thisYear-3;y<=thisYear+3;y++){
+ let o=document.createElement("option");
+ o.value=y;o.textContent=y;
+ document.getElementById("reportYear").appendChild(o)
+}
+document.getElementById("reportYear").value=thisYear;
+document.getElementById("reportMonth").value=thisMonth;
 
 function addExpense(){
- const date=document.getElementById("date").value, category=document.getElementById("category").value;
- const description=document.getElementById("description").value.trim(), amount=Number(document.getElementById("amount").value);
- if(!date||!amount||amount<0){alert("Tarih ve geçerli bir tutar gir.");return}
+ const date=document.getElementById("date").value;
+ const category=document.getElementById("category").value.trim();
+ const description=document.getElementById("description").value.trim();
+ const amount=Number(document.getElementById("amount").value);
+ if(!date||!category||!amount||amount<0){alert("Tarih, gider adı ve geçerli bir tutar gir.");return}
  expenses.push({id:Date.now(),date,category,description,amount});
  save();clearForm();render();
 }
-function clearForm(){document.getElementById("date").value=today();document.getElementById("description").value="";document.getElementById("amount").value=""}
-function removeExpense(id){if(confirm("Bu gider kaydını silmek istiyor musun?")){expenses=expenses.filter(x=>x.id!==id);save();render()}}
+
+function clearForm(){
+ document.getElementById("date").value=today();
+ document.getElementById("category").value="";
+ document.getElementById("description").value="";
+ document.getElementById("amount").value=""
+}
+
+function removeExpense(id){
+ if(confirm("Bu gider kaydını silmek istiyor musun?")){
+  expenses=expenses.filter(x=>x.id!==id);save();render()
+ }
+}
+
 function render(){
- const y=Number(document.getElementById("reportYear").value), m=Number(document.getElementById("reportMonth").value);
+ const y=Number(document.getElementById("reportYear").value);
+ const m=Number(document.getElementById("reportMonth").value);
  const d=new Date();
  const monthKey=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
  const thisMonthTotal=expenses.filter(x=>x.date.startsWith(monthKey)).reduce((s,x)=>s+x.amount,0);
  const yearTotal=expenses.filter(x=>x.date.startsWith(String(d.getFullYear()))).reduce((s,x)=>s+x.amount,0);
+
  document.getElementById("monthTotal").textContent=money(thisMonthTotal);
  document.getElementById("yearTotal").textContent=money(yearTotal);
  document.getElementById("recordCount").textContent=expenses.length;
- const selected=expenses.filter(x=>{let dt=new Date(x.date+"T00:00:00");return dt.getFullYear()===y&&dt.getMonth()===m});
- const total=selected.reduce((s,x)=>s+x.amount,0);document.getElementById("selectedTotal").textContent=money(total);
- const cats={};selected.forEach(x=>cats[x.category]=(cats[x.category]||0)+x.amount);
- document.getElementById("categoryReport").innerHTML=Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([c,v])=>{
-  const pct=total?v/total*100:0;return `<div class="category-row"><div style="flex:1"><b>${escapeHtml(c)}</b><div class="bar"><div class="fill" style="width:${pct}%"></div></div></div><b>${money(v)}</b></div>`
+
+ const selected=expenses.filter(x=>{
+  let dt=new Date(x.date+"T00:00:00");
+  return dt.getFullYear()===y&&dt.getMonth()===m
+ });
+ const total=selected.reduce((s,x)=>s+x.amount,0);
+ document.getElementById("selectedTotal").textContent=money(total);
+
+ const cats={};
+ selected.forEach(x=>cats[x.category]=(cats[x.category]||0)+x.amount);
+
+ document.getElementById("categoryReport").innerHTML=
+ Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([c,v])=>{
+  const pct=total?v/total*100:0;
+  return `<div class="category-row"><div style="flex:1"><b>${escapeHtml(c)}</b><div class="bar"><div class="fill" style="width:${pct}%"></div></div></div><b>${money(v)}</b></div>`
  }).join("")||'<div class="empty">Bu ay için kayıt yok.</div>';
+
+ // Geçmişten bugüne tüm kategorilerin toplamı
+ const allCats={};
+ expenses.forEach(x=>allCats[x.category]=(allCats[x.category]||0)+x.amount);
+ const allTotal=expenses.reduce((s,x)=>s+x.amount,0);
+
+ document.getElementById("allTimeCategoryReport").innerHTML=
+ Object.entries(allCats).sort((a,b)=>b[1]-a[1]).map(([c,v])=>{
+  const pct=allTotal?v/allTotal*100:0;
+  return `<div class="category-row"><div style="flex:1"><b>${escapeHtml(c)}</b><div class="bar"><div class="fill" style="width:${pct}%"></div></div></div><b>${money(v)}</b></div>`
+ }).join("")||'<div class="empty">Henüz gider kaydı yok.</div>';
+
+ // Kategori seçimini güncelle
+ const select=document.getElementById("categorySelect");
+ const current=select.value;
+ const names=Object.keys(allCats).sort((a,b)=>a.localeCompare(b,"tr"));
+ select.innerHTML='<option value="">Kategori seç...</option>'+
+ names.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+ if(names.includes(current)) select.value=current;
+ renderCategoryHistory();
+
  const sorted=[...expenses].sort((a,b)=>b.date.localeCompare(a.date));
- document.getElementById("expenseTable").innerHTML=sorted.map(x=>`<tr><td>${new Date(x.date+"T00:00:00").toLocaleDateString("tr-TR")}</td><td>${escapeHtml(x.category)}</td><td>${escapeHtml(x.description||"-")}</td><td class="amount">${money(x.amount)}</td><td><button class="delete" onclick="removeExpense(${x.id})">Sil</button></td></tr>`).join("");
+ document.getElementById("expenseTable").innerHTML=sorted.map(x=>
+ `<tr><td>${new Date(x.date+"T00:00:00").toLocaleDateString("tr-TR")}</td><td>${escapeHtml(x.category)}</td><td>${escapeHtml(x.description||"-")}</td><td class="amount">${money(x.amount)}</td><td><button class="delete" onclick="removeExpense(${x.id})">Sil</button></td></tr>`
+ ).join("");
  document.getElementById("empty").style.display=sorted.length?"none":"block";
 }
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+
+function renderCategoryHistory(){
+ const category=document.getElementById("categorySelect").value;
+ const total=expenses.filter(x=>x.category===category).reduce((s,x)=>s+x.amount,0);
+ document.getElementById("categoryHistoryTotal").textContent=category?money(total):"₺0";
+
+ const rows=expenses.filter(x=>x.category===category).sort((a,b)=>b.date.localeCompare(a.date));
+ document.getElementById("categoryHistory").innerHTML=
+ rows.length
+ ? `<div style="margin-top:12px"><table><thead><tr><th>Tarih</th><th>Açıklama</th><th class="amount">Tutar</th></tr></thead><tbody>`+
+ rows.map(x=>`<tr><td>${new Date(x.date+"T00:00:00").toLocaleDateString("tr-TR")}</td><td>${escapeHtml(x.description||"-")}</td><td class="amount">${money(x.amount)}</td></tr>`).join("")+
+ `</tbody></table></div>`
+ : (category?'<div class="empty">Bu kategori için kayıt yok.</div>':'<div class="empty">Bir kategori seç.</div>');
+}
+
+function escapeHtml(s){
+ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))
+}
+
 function exportData(){
  const blob=new Blob([JSON.stringify(expenses,null,2)],{type:"application/json"});
- const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="dukkan-gider-yedegi.json";a.click();URL.revokeObjectURL(a.href);
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);
+ a.download="dukkan-gider-yedegi.json";
+ a.click();
+ URL.revokeObjectURL(a.href);
 }
+
 function changePassword(){
- const oldP=document.getElementById("oldPass").value,newP=document.getElementById("newPass").value;
+ const oldP=document.getElementById("oldPass").value;
+ const newP=document.getElementById("newPass").value;
  if(oldP!==localStorage.getItem(PASS_KEY)){alert("Mevcut şifre yanlış.");return}
  if(newP.length<4){alert("Yeni şifre en az 4 karakter olmalı.");return}
- localStorage.setItem(PASS_KEY,newP);document.getElementById("oldPass").value="";document.getElementById("newPass").value="";
+ localStorage.setItem(PASS_KEY,newP);
+ document.getElementById("oldPass").value="";
+ document.getElementById("newPass").value="";
  alert("Şifre değiştirildi.");
 }
-function deleteAll(){if(confirm("TÜM gider kayıtları silinecek. Emin misin?")){expenses=[];save();render()}}
+
+function deleteAll(){
+ if(confirm("TÜM gider kayıtları silinecek. Emin misin?")){
+  expenses=[];save();render()
+ }
+}
+
 render();
 </script>
 </body>
