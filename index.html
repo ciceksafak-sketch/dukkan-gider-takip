@@ -131,19 +131,6 @@ function resetPasswordSetup(){
    document.getElementById("loginError").style.display="block";
  }
 }
-document.getElementById("loginPassword").value;
- const saved=localStorage.getItem(PASS_KEY);
- if(!saved){
-   if(entered.length<4){document.getElementById("loginError").textContent="İlk şifre en az 4 karakter olmalı.";document.getElementById("loginError").style.display="block";return}
-   localStorage.setItem(PASS_KEY,entered);
-   document.getElementById("loginScreen").style.display="none";
- } else if(entered===saved){
-   document.getElementById("loginScreen").style.display="none";
- } else {
-   document.getElementById("loginError").textContent="Şifre yanlış.";
-   document.getElementById("loginError").style.display="block";
- }
-}
 document.getElementById("loginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
 if(localStorage.getItem(PASS_KEY)){}
 let expenses=JSON.parse(localStorage.getItem(KEY)||"[]");
