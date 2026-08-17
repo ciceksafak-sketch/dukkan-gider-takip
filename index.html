@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>Dükkan Gider Takip</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f3f4f6;color:#111827}
+header{background:#111827;color:white;padding:22px 18px 18px;position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:23px}.sub{opacity:.7;font-size:13px;margin-top:4px}
+main{max-width:900px;margin:auto;padding:16px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.card{background:white;border-radius:16px;padding:15px;box-shadow:0 2px 10px #0000000d}.label{font-size:12px;color:#6b7280}.value{font-size:20px;font-weight:750;margin-top:5px}
+.panel{background:white;border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:0 2px 10px #0000000d}
+h2{font-size:17px;margin:0 0 14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{font-size:12px;color:#6b7280;display:block;margin-bottom:5px}
+input,select,button{width:100%;font:inherit;border-radius:11px;padding:12px;border:1px solid #d1d5db;background:white}
+button{border:0;background:#111827;color:white;font-weight:700;cursor:pointer}.secondary{background:#e5e7eb;color:#111827}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 6px;border-bottom:1px solid #eee;text-align:left}th{color:#6b7280;font-size:11px}
+.amount{text-align:right;font-weight:700}.delete{background:#fee2e2;color:#991b1b;padding:7px 9px;width:auto}
+.category-row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #eee}.bar{height:7px;background:#e5e7eb;border-radius:99px;margin-top:5px;overflow:hidden}.fill{height:100%;background:#111827}
+.empty{text-align:center;color:#6b7280;padding:20px}
+.total-highlight{font-size:28px;font-weight:800;margin-top:10px}.small-note{color:#6b7280;font-size:12px;margin-top:3px}
+@media(max-width:600px){.cards{grid-template-columns:1fr 1fr}.cards .card:last-child{grid-column:1/-1}.grid{grid-template-columns:1fr}table{font-size:12px}th:nth-child(3),td:nth-child(3){display:none}}
+
+.kasa-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.kasa-box{background:#f8fafc;border:1px solid #e5e7eb;border-radius:14px;padding:14px}
+.kasa-box .kasa-label{font-size:12px;color:#6b7280}
+.kasa-box .kasa-value{font-size:20px;font-weight:800;margin-top:5px}
+.kasa-green{color:#166534}.kasa-blue{color:#1d4ed8}.kasa-red{color:#b91c1c}
+.kasa-history{overflow:auto}.kasa-history table{min-width:720px}
+@media(max-width:700px){.kasa-grid{grid-template-columns:1fr 1fr}}
+
+.menu-toggle{display:none;position:fixed;top:12px;left:12px;z-index:20;width:46px;height:46px;border-radius:12px;background:#111827;color:#fff;border:0;font-size:24px}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:245px;background:#111827;color:#fff;padding:22px 14px;z-index:15;overflow:auto}
+.sidebar h3{font-size:18px;margin:0 10px 22px}.side-btn{display:block;width:100%;text-align:left;background:transparent;color:#e5e7eb;border:0;padding:13px 12px;border-radius:11px;margin-bottom:5px;font-weight:700}.side-btn.active{background:#374151;color:#fff}
+.app-content{margin-left:245px}.report-view{display:none}.report-view.active{display:block}
+.dashboard-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.dashboard-card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 10px #0000000d}.dashboard-card .label{font-size:12px;color:#6b7280}.dashboard-card .big{font-size:24px;font-weight:850;margin-top:6px}
+.filter-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.filter-result{overflow:auto}.filter-result table{min-width:760px}
+@media(max-width:800px){.sidebar{transform:translateX(-100%);transition:transform .2s}.sidebar.open{transform:translateX(0)}.menu-toggle{display:block}.app-content{margin-left:0}header{padding-left:68px}.dashboard-grid{grid-template-columns:1fr 1fr}.filter-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:500px){.filter-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<button id="menuToggle" class="menu-toggle" type="button" onclick="toggleMenu()">☰</button>
+<aside id="sidebar" class="sidebar">
+<h3>💰 Gider Takip</h3>
+<button class="side-btn active" onclick="showView('dashboard',this)">🏠 Genel Bakış</button>
+<button class="side-btn" onclick="showView('monthly',this)">📅 Aylık Ciro</button>
+<button class="side-btn" onclick="showView('yearly',this)">📆 Yıllık Ciro</button>
+<button class="side-btn" onclick="showView('incomeExpense',this)">💰 Gelir / Gider</button>
+<button class="side-btn" onclick="showView('expenses',this)">🧾 Nereye / Kime Ödedim?</button>
+<button class="side-btn" onclick="showView('main',this)">📋 Tüm Kayıtlar</button>
+</aside>
+<div class="app-content">
+<div id="loginScreen" style="position:fixed;inset:0;background:#111827;color:white;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="width:100%;max-width:380px;background:white;color:#111827;border-radius:20px;padding:24px;box-shadow:0 20px 50px #0008">
+    <h2 style="margin:0 0 8px">🔐 Gider Takip</h2>
+    <p style="color:#6b7280;font-size:13px;margin:0 0 16px">Programa girmek için şifreni yaz.</p>
+    <input id="loginPassword" type="password" placeholder="Şifre" autocomplete="current-password" style="width:100%;font:inherit;border-radius:11px;padding:12px;border:1px solid #d1d5db;display:block;opacity:1">
+    <button id="loginButton" type="button" style="display:block !important;visibility:visible !important;opacity:1 !important;pointer-events:auto !important;width:100%;margin-top:10px;font:inherit;border-radius:11px;padding:12px;border:0;background:#111827;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none">Giriş Yap</button>
+    <button onclick="resetPasswordSetup()" style="width:100%;margin-top:8px;font:inherit;border-radius:11px;padding:10px;border:1px solid #d1d5db;background:#f3f4f6;color:#111827;font-weight:600">Şifreyi Sıfırla</button>
+    <div id="loginError" style="color:#b91c1c;font-size:12px;margin-top:10px;display:none">Şifre yanlış.</div>
+  </div>
+</div>
+
+<header><h1>💰 Dükkan Gider Takip</h1><div class="sub">Giderlerini kaydet, aylık ve kategori bazında takip et.</div></header>
+<main>
+
+<section class="cards">
+<div class="card"><div class="label">Bu Ay</div><div class="value" id="monthTotal">₺0</div></div>
+<div class="card"><div class="label">Bu Yıl</div><div class="value" id="yearTotal">₺0</div></div>
+<div class="card"><div class="label">Toplam Kayıt</div><div class="value" id="recordCount">0</div></div>
+</section>
+
+
+<section class="panel" id="kasaPanel">
+<h2>💵 Kasa Takip</h2>
+<div class="grid">
+  <div><label>Tarih</label><input type="date" id="kasaDate"></div>
+  <div><label>Gün Başlangıç Kasası</label><input id="kasaStart" type="number" min="0" step="0.01" placeholder="0"></div>
+  <div><label>Gün Sonu Kasası</label><input id="kasaEnd" type="number" min="0" step="0.01" placeholder="0"></div>
+</div>
+<div class="kasa-grid" style="margin-top:12px">
+  <div class="kasa-box"><div class="kasa-label">Başlangıç</div><div class="kasa-value" id="kasaStartView">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Gider</div><div class="kasa-value kasa-red" id="kasaExpenseView">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Otomatik Ciro / Gelir</div><div class="kasa-value kasa-blue" id="kasaIncomeView">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Gün Sonu</div><div class="kasa-value kasa-green" id="kasaEndView">₺0</div></div>
+</div>
+<div class="small-note" style="margin-top:10px">
+Gelir = Gün sonu kasa + o günün giderleri − gün başlangıç kasası. Giderler kasa hesabından ayrı kaydedilir ve ayrıca görünür.
+</div>
+<div class="actions">
+  <button type="button" onclick="saveKasaDay()">Kasa Gününü Kaydet</button>
+  <button type="button" class="secondary" onclick="clearKasaForm()">Temizle</button>
+</div>
+</section>
+
+<section class="panel">
+<h2>📅 Kasa Özeti</h2>
+<div class="kasa-grid">
+  <div class="kasa-box"><div class="kasa-label">Bugünkü Gelir</div><div class="kasa-value kasa-blue" id="todayIncome">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Bu Hafta Gelir</div><div class="kasa-value" id="weekIncome">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Bu Ay Gelir</div><div class="kasa-value" id="monthIncome">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Toplam Gelir</div><div class="kasa-value" id="allIncome">₺0</div></div>
+</div>
+</section>
+
+<section class="panel">
+<h2>🧾 Kasa Geçmişi</h2>
+<div class="kasa-history">
+<table>
+<thead><tr><th>Tarih</th><th>Başlangıç</th><th>Gider</th><th>Gelir</th><th>Gün Sonu</th><th></th></tr></thead>
+<tbody id="kasaTable"></tbody>
+</table>
+</div>
+<div id="kasaEmpty" class="empty">Henüz kasa günü kaydedilmedi.</div>
+<div class="small-note" style="margin-top:10px">Geçmişteki bir günü değiştirmek için <b>Düzenle</b>'ye bas. Tarih, başlangıç ve gün sonu alanları yukarıda açılır; değiştirip tekrar kaydedebilirsin.</div>
+</section>
+
+<section class="panel">
+<h2>Gider Ekle</h2>
+<div class="grid">
+<div><label>Tarih</label><input type="date" id="date"></div>
+<div><label>Gider Adı / Kategori</label><input id="category" placeholder="Örn. Kira / Elektrik / Bakkal"></div>
+<div><label>Nereye / Kime</label><input id="recipient" placeholder="Örn. Ev sahibi / TEDAŞ / Ahmet"></div>
+<div><label>Açıklama</label><input id="description" placeholder="Örn. Ağustos kira"></div>
+<div><label>Tutar (TL)</label><input id="amount" type="number" min="0" step="0.01" placeholder="0"></div>
+</div>
+<div class="actions"><button onclick="addExpense()">Gideri Kaydet</button><button class="secondary" onclick="clearForm()">Temizle</button></div>
+</section>
+
+<section class="panel">
+<h2>Aylık Rapor</h2>
+<div class="grid">
+<div><label>Yıl</label><select id="reportYear" onchange="render()"></select></div>
+<div><label>Ay</label><select id="reportMonth" onchange="render()">
+<option value="0">Ocak</option><option value="1">Şubat</option><option value="2">Mart</option><option value="3">Nisan</option>
+<option value="4">Mayıs</option><option value="5">Haziran</option><option value="6">Temmuz</option><option value="7">Ağustos</option>
+<option value="8">Eylül</option><option value="9">Ekim</option><option value="10">Kasım</option><option value="11">Aralık</option>
+</select></div>
+</div>
+<div style="margin-top:14px;font-size:24px;font-weight:800" id="selectedTotal">₺0</div>
+<div style="color:#6b7280;font-size:12px;margin-top:3px">Seçilen ayın toplam gideri</div>
+</section>
+
+<section class="panel">
+<h2>Gider Dağılımı — Seçilen Ay</h2>
+<div id="categoryReport"></div>
+</section>
+
+<section class="panel">
+<h2>📊 Geçmişten Bugüne Kategori Toplamları</h2>
+<div id="allTimeCategoryReport"></div>
+</section>
+
+<section class="panel">
+<h2>🔎 Kategori Geçmişi</h2>
+<label>Kategori seç</label>
+<select id="categorySelect" onchange="renderCategoryHistory()">
+<option value="">Kategori seç...</option>
+</select>
+<div id="categoryHistoryTotal" class="total-highlight">₺0</div>
+<div class="small-note">Seçilen kategorinin geçmişten bugüne toplam gideri</div>
+<div id="categoryHistory"></div>
+</section>
+
+<section class="panel">
+<h2>Gider Kayıtları</h2>
+<div style="overflow:auto"><table><thead><tr><th>Tarih</th><th>Tür</th><th>Açıklama</th><th class="amount">Tutar</th><th></th></tr></thead>
+<tbody id="expenseTable"></tbody></table></div>
+<div id="empty" class="empty">Henüz gider kaydı yok.</div>
+</section>
+
+<section class="panel">
+<h2>Şifre Değiştir</h2>
+<div class="grid">
+<div><label>Mevcut Şifre</label><input id="oldPass" type="password"></div>
+<div><label>Yeni Şifre</label><input id="newPass" type="password" minlength="4"></div>
+</div>
+<button style="margin-top:10px" onclick="changePassword()">Şifreyi Değiştir</button>
+</section>
+
+<section class="panel">
+<h2>Veri Yönetimi</h2>
+<div class="actions">
+<button class="secondary" onclick="exportData()">Yedeği İndir</button>
+<button class="secondary" onclick="document.getElementById('backupFile').click()">Yedeği Yükle</button>
+<input id="backupFile" type="file" accept=".json,application/json" style="display:none" onchange="importData(event)">
+<button class="delete" onclick="deleteAll()">Tümünü Sil</button>
+</div>
+<p style="font-size:12px;color:#6b7280;margin-bottom:0">Kayıtlar bu cihazın tarayıcısında saklanır. Telefon değiştirirken “Yedeği İndir” ile dosyanı saklayabilirsin.</p>
+</section>
+</main>
+
+<script>
+const KEY="dukkan_giderleri_v1";
+const PASS_KEY="dukkan_gider_sifre_v1";
+const CASH_KEY="dukkan_kasa_gunleri_v1";
+
+function login(){
+ const entered=document.getElementById("loginPassword").value;
+ const saved=localStorage.getItem(PASS_KEY);
+ if(!saved){
+   if(entered.length<4){
+     document.getElementById("loginError").textContent="Şifre en az 4 karakter olmalı.";
+     document.getElementById("loginError").style.display="block"; return;
+   }
+   localStorage.setItem(PASS_KEY,entered);
+   document.getElementById("loginScreen").style.display="none";
+   document.getElementById("loginError").style.display="none";
+ } else if(entered===saved){
+   document.getElementById("loginScreen").style.display="none";
+   document.getElementById("loginError").style.display="none";
+ } else {
+   document.getElementById("loginError").textContent="Şifre yanlış. İlk kurulumu yapmak istiyorsan Şifreyi Sıfırla'ya bas.";
+   document.getElementById("loginError").style.display="block";
+ }
+}
+
+function resetPasswordSetup(){
+ if(confirm("Şifre sıfırlanacak. Gider kayıtların SİLİNMEYECEK. Devam edilsin mi?")){
+   localStorage.removeItem(PASS_KEY);
+   document.getElementById("loginPassword").value="";
+   document.getElementById("loginError").textContent="Yeni şifreni yaz ve Giriş Yap'a bas. (En az 4 karakter)";
+   document.getElementById("loginError").style.color="#166534";
+   document.getElementById("loginError").style.display="block";
+ }
+}
+
+const loginButton=document.getElementById("loginButton");
+loginButton.disabled=false;
+loginButton.addEventListener("click",login);
+loginButton.addEventListener("touchend",e=>{e.preventDefault();login()},{passive:false});
+document.getElementById("loginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
+
+let expenses=JSON.parse(localStorage.getItem(KEY)||"[]");
+
+let kasaDays=JSON.parse(localStorage.getItem(CASH_KEY)||"[]");
+
+function saveKasa(){localStorage.setItem(CASH_KEY,JSON.stringify(kasaDays))}
+
+function expensesForDate(date){
+  return expenses.filter(x=>x.date===date).reduce((s,x)=>s+Number(x.amount||0),0);
+}
+
+function previousKasaEnd(date){
+  const prior=kasaDays
+    .filter(x=>x.date<date)
+    .sort((a,b)=>b.date.localeCompare(a.date));
+  return prior.length?Number(prior[0].end||0):0;
+}
+
+function kasaIncome(day){
+  const currentExpenses=expensesForDate(day.date);
+  return Number(day.end||0)+currentExpenses-Number(day.start||0);
+}
+
+function updateKasaStartFromDate(){
+  const date=document.getElementById("kasaDate").value;
+  const existing=kasaDays.find(x=>x.date===date);
+  const start=document.getElementById("kasaStart");
+  if(existing){
+    start.value=existing.start;
+    document.getElementById("kasaEnd").value=existing.end;
+  }else{
+    const prev=previousKasaEnd(date);
+    start.value=prev||"";
+    document.getElementById("kasaEnd").value="";
+  }
+  renderKasaPreview();
+}
+
+function renderKasaPreview(){
+  const date=document.getElementById("kasaDate").value;
+  const start=Number(document.getElementById("kasaStart").value||0);
+  const end=Number(document.getElementById("kasaEnd").value||0);
+  const exp=expensesForDate(date);
+  const income=end+exp-start;
+  document.getElementById("kasaStartView").textContent=money(start);
+  document.getElementById("kasaExpenseView").textContent=money(exp);
+  document.getElementById("kasaIncomeView").textContent=money(income);
+  document.getElementById("kasaEndView").textContent=money(end);
+}
+
+function saveKasaDay(){
+  const date=document.getElementById("kasaDate").value;
+  const start=Number(document.getElementById("kasaStart").value);
+  const end=Number(document.getElementById("kasaEnd").value);
+  if(!date||!Number.isFinite(start)||start<0||!Number.isFinite(end)||end<0){
+    alert("Tarih, başlangıç kasası ve gün sonu kasasını gir.");
+    return;
+  }
+  const exp=expensesForDate(date);
+  const item={date,start,end,expenses:exp,income:end+exp-start};
+  const i=kasaDays.findIndex(x=>x.date===date);
+  if(i>=0) kasaDays[i]=item; else kasaDays.push(item);
+  kasaDays.sort((a,b)=>a.date.localeCompare(b.date));
+  saveKasa();
+  renderKasa();
+
+  // Kaydetten sonra otomatik olarak bir sonraki güne geç:
+  // Yeni günün başlangıç kasası, az önce kaydedilen günün kapanış kasası olur.
+  const next=new Date(date+"T00:00:00");
+  next.setDate(next.getDate()+1);
+  const nextDate=next.getFullYear()+"-"+String(next.getMonth()+1).padStart(2,"0")+"-"+String(next.getDate()).padStart(2,"0");
+  document.getElementById("kasaDate").value=nextDate;
+  document.getElementById("kasaStart").value=end;
+  document.getElementById("kasaEnd").value="";
+  renderKasaPreview();
+  alert("Kasa günü kaydedildi. Bir sonraki güne geçildi.");
+}
+
+function clearKasaForm(){
+  document.getElementById("kasaDate").value=today();
+  updateKasaStartFromDate();
+}
+
+function editKasaDay(date){
+  const item=kasaDays.find(x=>x.date===date);
+  if(!item) return;
+  document.getElementById("kasaDate").value=item.date;
+  document.getElementById("kasaStart").value=item.start;
+  document.getElementById("kasaEnd").value=item.end;
+  renderKasaPreview();
+  document.getElementById("kasaPanel").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function removeKasaDay(date){
+  if(confirm("Bu kasa gününü silmek istiyor musun?")){
+    kasaDays=kasaDays.filter(x=>x.date!==date);
+    saveKasa();
+    renderKasa();
+    updateKasaStartFromDate();
+  }
+}
+
+function mondayOfWeek(date){
+  const d=new Date(date+"T00:00:00");
+  const day=d.getDay();
+  const diff=day===0?-6:1-day;
+  d.setDate(d.getDate()+diff);
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+
+function renderKasa(){
+  const t=today();
+  const todayRow=kasaDays.find(x=>x.date===t);
+  const weekStart=mondayOfWeek(t);
+  const ym=t.slice(0,7);
+  const todayIncomeValue=todayRow?kasaIncome(todayRow):0;
+  const week=kasaDays.filter(x=>x.date>=weekStart).reduce((s,x)=>s+kasaIncome(x),0);
+  const month=kasaDays.filter(x=>x.date.startsWith(ym)).reduce((s,x)=>s+kasaIncome(x),0);
+  const all=kasaDays.reduce((s,x)=>s+kasaIncome(x),0);
+  document.getElementById("todayIncome").textContent=money(todayIncomeValue);
+  document.getElementById("weekIncome").textContent=money(week);
+  document.getElementById("monthIncome").textContent=money(month);
+  document.getElementById("allIncome").textContent=money(all);
+
+  const rows=[...kasaDays].sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById("kasaTable").innerHTML=rows.map(x=>
+    `<tr><td>${new Date(x.date+"T00:00:00").toLocaleDateString("tr-TR")}</td>
+    <td>${money(x.start)}</td><td>${money(x.expenses)}</td>
+    <td class="amount">${money(kasaIncome(x))}</td><td>${money(x.end)}</td>
+    <td style="white-space:nowrap"><button type="button" onclick="editKasaDay('${x.date}')" style="width:auto;padding:7px 9px;margin-right:5px">Düzenle</button><button type="button" class="delete" onclick="removeKasaDay('${x.date}')">Sil</button></td></tr>`
+  ).join("");
+  document.getElementById("kasaEmpty").style.display=rows.length?"none":"block";
+}
+
+const months=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+const money=n=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:2}).format(n);
+
+function save(){localStorage.setItem(KEY,JSON.stringify(expenses))}
+function today(){
+  const d=new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+document.getElementById("date").value=today();
+
+const now=new Date(), thisYear=now.getFullYear(), thisMonth=now.getMonth();
+for(let y=thisYear-3;y<=thisYear+3;y++){
+ let o=document.createElement("option");
+ o.value=y;o.textContent=y;
+ document.getElementById("reportYear").appendChild(o)
+}
+document.getElementById("reportYear").value=thisYear;
+document.getElementById("reportMonth").value=thisMonth;
+
+function addExpense(){
+ const date=document.getElementById("date").value;
+ const category=document.getElementById("category").value.trim();
+ const description=document.getElementById("description").value.trim();
+ const amount=Number(document.getElementById("amount").value);
+ if(!date||!category||!amount||amount<0){alert("Tarih, gider adı ve geçerli bir tutar gir.");return}
+ expenses.push({id:Date.now(),date,category,recipient,description,amount});
+ save();clearForm();render();renderKasa();renderKasaPreview();
+}
+
+function clearForm(){
+ document.getElementById("date").value=today();
+ document.getElementById("category").value="";
+ document.getElementById("description").value="";
+ document.getElementById("amount").value=""
+}
+
+function removeExpense(id){
+ if(confirm("Bu gider kaydını silmek istiyor musun?")){
+  expenses=expenses.filter(x=>x.id!==id);save();render()
+ }
+}
+
+function render(){
+ const y=Number(document.getElementById("reportYear").value);
+ const m=Number(document.getElementById("reportMonth").value);
+ const d=new Date();
+ const monthKey=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+ const thisMonthTotal=expenses.filter(x=>x.date.startsWith(monthKey)).reduce((s,x)=>s+x.amount,0);
+ const yearTotal=expenses.filter(x=>x.date.startsWith(String(d.getFullYear()))).reduce((s,x)=>s+x.amount,0);
+
+ document.getElementById("monthTotal").textContent=money(thisMonthTotal);
+ document.getElementById("yearTotal").textContent=money(yearTotal);
+ document.getElementById("recordCount").textContent=expenses.length;
+
+ const selected=expenses.filter(x=>{
+  let dt=new Date(x.date+"T00:00:00");
+  return dt.getFullYear()===y&&dt.getMonth()===m
+ });
+ const total=selected.reduce((s,x)=>s+x.amount,0);
+ document.getElementById("selectedTotal").textContent=money(total);
+
+ const cats={};
+ selected.forEach(x=>cats[x.category]=(cats[x.category]||0)+x.amount);
+
+ document.getElementById("categoryReport").innerHTML=
+ Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([c,v])=>{
+  const pct=total?v/total*100:0;
+  return `<div class="category-row"><div style="flex:1"><b>${escapeHtml(c)}</b><div class="bar"><div class="fill" style="width:${pct}%"></div></div></div><b>${money(v)}</b></div>`
+ }).join("")||'<div class="empty">Bu ay için kayıt yok.</div>';
+
+ // Geçmişten bugüne tüm kategorilerin toplamı
+ const allCats={};
+ expenses.forEach(x=>allCats[x.category]=(allCats[x.category]||0)+x.amount);
+ const allTotal=expenses.reduce((s,x)=>s+x.amount,0);
+
+ document.getElementById("allTimeCategoryReport").innerHTML=
+ Object.entries(allCats).sort((a,b)=>b[1]-a[1]).map(([c,v])=>{
+  const pct=allTotal?v/allTotal*100:0;
+  return `<div class="category-row"><div style="flex:1"><b>${escapeHtml(c)}</b><div class="bar"><div class="fill" style="width:${pct}%"></div></div></div><b>${money(v)}</b></div>`
+ }).join("")||'<div class="empty">Henüz gider kaydı yok.</div>';
+
+ // Kategori seçimini güncelle
+ const select=document.getElementById("categorySelect");
+ const current=select.value;
+ const names=Object.keys(allCats).sort((a,b)=>a.localeCompare(b,"tr"));
+ select.innerHTML='<option value="">Kategori seç...</option>'+
+ names.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+ if(names.includes(current)) select.value=current;
+ renderCategoryHistory();
+
+ const sorted=[...expenses].sort((a,b)=>b.date.localeCompare(a.date));
+ document.getElementById("expenseTable").innerHTML=sorted.map(x=>
+ `<tr><td>${new Date(x.date+"T00:00:00").toLocaleDateString("tr-TR")}</td><td>${escapeHtml(x.category)}</td><td>${escapeHtml(x.description||"-")}</td><td class="amount">${money(x.amount)}</td><td><button class="delete" onclick="removeExpense(${x.id})">Sil</button></td></tr>`
+ ).join("");
+ document.getElementById("empty").style.display=sorted.length?"none":"block";
+}
+
+function renderCategoryHistory(){
+ const category=document.getElementById("categorySelect").value;
+ const total=expenses.filter(x=>x.category===category).reduce((s,x)=>s+x.amount,0);
+ document.getElementById("categoryHistoryTotal").textContent=category?money(total):"₺0";
+
+ const rows=expenses.filter(x=>x.category===category).sort((a,b)=>b.date.localeCompare(a.date));
+ document.getElementById("categoryHistory").innerHTML=
+ rows.length
+ ? `<div style="margin-top:12px"><table><thead><tr><th>Tarih</th><th>Açıklama</th><th class="amount">Tutar</th></tr></thead><tbody>`+
+ rows.map(x=>`<tr><td>${new Date(x.date+"T00:00:00").toLocaleDateString("tr-TR")}</td><td>${escapeHtml(x.description||"-")}</td><td class="amount">${money(x.amount)}</td></tr>`).join("")+
+ `</tbody></table></div>`
+ : (category?'<div class="empty">Bu kategori için kayıt yok.</div>':'<div class="empty">Bir kategori seç.</div>');
+}
+
+function escapeHtml(s){
+ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))
+}
+
+function exportData(){
+ const blob=new Blob([JSON.stringify({version:2,expenses,kasaDays},null,2)],{type:"application/json"});
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);
+ a.download="dukkan-gider-yedegi.json";
+ a.click();
+ URL.revokeObjectURL(a.href);
+}
+
+function importData(event){
+  const file=event.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const data=JSON.parse(reader.result);
+      let imported;
+      if(Array.isArray(data)){
+        imported=data;
+      }else if(Array.isArray(data.expenses)){
+        imported=data.expenses;
+        if(Array.isArray(data.kasaDays)){
+          kasaDays=data.kasaDays;
+          saveKasa();
+        }
+      }else{
+        throw new Error("Geçersiz yedek");
+      }
+      expenses=imported;
+      save();
+      render();
+      if(typeof renderKasa==="function") renderKasa();
+      if(typeof renderKasaPreview==="function") renderKasaPreview();
+      if(typeof renderDashboard==="function") renderDashboard();
+      if(typeof renderMonthlyReport==="function") renderMonthlyReport();
+      if(typeof renderYearlyReport==="function") renderYearlyReport();
+      if(typeof fillReportFilters==="function") fillReportFilters();
+      if(typeof renderFilters==="function") renderFilters();
+      if(typeof renderPaymentReport==="function") renderPaymentReport();
+      alert(imported.length+" kayıt başarıyla geri yüklendi.");
+    }catch(e){
+      alert("Yedek dosyası okunamadı.");
+    }
+    event.target.value="";
+  };
+  reader.readAsText(file);
+}
+
+function changePassword(){
+ const oldP=document.getElementById("oldPass").value;
+ const newP=document.getElementById("newPass").value;
+ if(oldP!==localStorage.getItem(PASS_KEY)){alert("Mevcut şifre yanlış.");return}
+ if(newP.length<4){alert("Yeni şifre en az 4 karakter olmalı.");return}
+ localStorage.setItem(PASS_KEY,newP);
+ document.getElementById("oldPass").value="";
+ document.getElementById("newPass").value="";
+ alert("Şifre değiştirildi.");
+}
+
+function deleteAll(){
+ if(confirm("TÜM gider kayıtları silinecek. Emin misin?")){
+  expenses=[];save();render();renderKasa();renderKasaPreview()
+ }
+}
+
+
+function toggleMenu(){document.getElementById("sidebar").classList.toggle("open")}
+function showView(name,btn){
+ document.querySelectorAll(".report-view").forEach(v=>v.classList.remove("active"));
+ const id=name==="main"||name==="kasa"?"mainView":name+"View";
+ const target=document.getElementById(id);
+ if(target) target.classList.add("active");
+ document.querySelectorAll(".side-btn").forEach(b=>b.classList.remove("active")); if(btn)btn.classList.add("active");
+ document.getElementById("sidebar").classList.remove("open");
+ if(name==="dashboard")renderDashboard();
+ if(name==="monthly")renderMonthlyReport();
+ if(name==="yearly")renderYearlyReport();
+ if(name==="incomeExpense"){fillReportFilters();renderFilters()}
+ if(name==="expenses"){fillReportFilters();renderPaymentReport()}
+ if(name==="kasa"){
+   setTimeout(()=>{const k=document.getElementById("kasaPanel");if(k)k.scrollIntoView({behavior:"smooth",block:"start"})},50);
+ }
+}
+function totalExpenseBetween(s,e){return expenses.filter(x=>(!s||x.date>=s)&&(!e||x.date<=e)).reduce((a,x)=>a+Number(x.amount||0),0)}
+function totalIncomeBetween(s,e){return kasaDays.filter(x=>(!s||x.date>=s)&&(!e||x.date<=e)).reduce((a,x)=>a+kasaIncome(x),0)}
+function cashIncomeDate(d){const x=kasaDays.find(x=>x.date===d);return x?kasaIncome(x):0}
+function renderDashboard(){
+ const t=today(),ym=t.slice(0,7),y=t.slice(0,4),mi=totalIncomeBetween(ym+"-01",ym+"-31"),me=totalExpenseBetween(ym+"-01",ym+"-31");
+ document.getElementById("dashToday").textContent=money(cashIncomeDate(t));document.getElementById("dashMonth").textContent=money(mi);document.getElementById("dashYear").textContent=money(totalIncomeBetween(y+"-01-01",y+"-12-31"));document.getElementById("dashExpense").textContent=money(expenses.reduce((a,x)=>a+Number(x.amount||0),0));
+ document.getElementById("dashMonthIncome").textContent=money(mi);document.getElementById("dashMonthExpense").textContent=money(me);document.getElementById("dashMonthNet").textContent=money(mi-me);document.getElementById("dashExpenseCount").textContent=expenses.filter(x=>x.date.startsWith(ym)).length;
+}
+function fillYears(){
+ const years=new Set([new Date().getFullYear()]);expenses.forEach(x=>years.add(+x.date.slice(0,4)));kasaDays.forEach(x=>years.add(+x.date.slice(0,4)));
+ const ys=[...years].sort((a,b)=>b-a);["monthlyYear","yearlyYear"].forEach(id=>{const e=document.getElementById(id),old=e.value;e.innerHTML=ys.map(y=>`<option>${y}</option>`).join("");if(ys.includes(+old))e.value=old});
+}
+function renderMonthlyReport(){
+ fillYears();const y=+(document.getElementById("monthlyYear").value||new Date().getFullYear()),m=+(document.getElementById("monthlyMonth").value||new Date().getMonth()),s=`${y}-${String(m+1).padStart(2,"0")}-01`,e=`${y}-${String(m+1).padStart(2,"0")}-31`,i=totalIncomeBetween(s,e),x=totalExpenseBetween(s,e);
+ document.getElementById("monthlyIncome").textContent=money(i);document.getElementById("monthlyExpense").textContent=money(x);document.getElementById("monthlyNet").textContent=money(i-x);document.getElementById("monthlyDays").textContent=kasaDays.filter(k=>k.date>=s&&k.date<=e).length;
+}
+function renderYearlyReport(){
+ fillYears();const y=+(document.getElementById("yearlyYear").value||new Date().getFullYear());let ti=0,te=0,h="";
+ months.forEach((n,m)=>{const s=`${y}-${String(m+1).padStart(2,"0")}-01`,e=`${y}-${String(m+1).padStart(2,"0")}-31`,i=totalIncomeBetween(s,e),x=totalExpenseBetween(s,e);ti+=i;te+=x;h+=`<div class="category-row"><div style="flex:1"><b>${n}</b><div class="small-note">Ciro: ${money(i)} · Gider: ${money(x)}</div></div><b>${money(i-x)}</b></div>`});
+ document.getElementById("yearlyRows").innerHTML=`<div class="dashboard-grid" style="margin-bottom:14px"><div class="dashboard-card"><div class="label">Yıllık Ciro</div><div class="big">${money(ti)}</div></div><div class="dashboard-card"><div class="label">Yıllık Gider</div><div class="big">${money(te)}</div></div><div class="dashboard-card"><div class="label">Yıllık Net</div><div class="big">${money(ti-te)}</div></div></div>`+h;
+}
+function fillMonths(){const e=document.getElementById("monthlyMonth");e.innerHTML=months.map((m,i)=>`<option value="${i}">${m}</option>`).join("");e.value=new Date().getMonth()}
+function fillReportFilters(){
+ const cats=[...new Set(expenses.map(x=>x.category))].sort((a,b)=>a.localeCompare(b,"tr"));
+ ["filterCategory","payCategory"].forEach(id=>{const e=document.getElementById(id),old=e.value;e.innerHTML='<option value="">Tüm kategoriler</option>'+cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");if(cats.includes(old))e.value=old});
+}
+function renderFilters(){
+ const s=document.getElementById("filterStart").value,e=document.getElementById("filterEnd").value,c=document.getElementById("filterCategory").value,t=document.getElementById("filterType").value,r=[];
+ if(t!=="expense")kasaDays.filter(x=>(!s||x.date>=s)&&(!e||x.date<=e)).forEach(x=>r.push({date:x.date,type:"Gelir",cat:"Kasa",desc:"Günlük kasa cirosu",amt:kasaIncome(x)}));
+ if(t!=="income")expenses.filter(x=>(!s||x.date>=s)&&(!e||x.date<=e)&&(!c||x.category===c)).forEach(x=>r.push({date:x.date,type:"Gider",cat:x.category,desc:(x.recipient?x.recipient+" — ":"")+(x.description||"-"),amt:+x.amount||0}));
+ r.sort((a,b)=>b.date.localeCompare(a.date));const i=r.filter(x=>x.type==="Gelir").reduce((a,x)=>a+x.amt,0),g=r.filter(x=>x.type==="Gider").reduce((a,x)=>a+x.amt,0);
+ document.getElementById("filteredIncome").textContent=money(i);document.getElementById("filteredExpense").textContent=money(g);document.getElementById("filteredNet").textContent=money(i-g);document.getElementById("filteredCount").textContent=r.length;
+ document.getElementById("filterTable").innerHTML=r.map(x=>`<tr><td>${new Date(x.date+"T00:00:00").toLocaleDateString("tr-TR")}</td><td>${x.type}</td><td>${escapeHtml(x.cat)}</td><td>${escapeHtml(x.desc)}</td><td class="amount">${money(x.amt)}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">Kayıt bulunamadı.</td></tr>';
+}
+function clearFilters(){["filterStart","filterEnd"].forEach(id=>document.getElementById(id).value="");document.getElementById("filterCategory").value="";document.getElementById("filterType").value="all";renderFilters()}
+function renderPaymentReport(){
+ const s=document.getElementById("payStart").value,e=document.getElementById("payEnd").value,c=document.getElementById("payCategory").value,q=document.getElementById("paySearch").value.trim().toLocaleLowerCase("tr-TR");
+ const r=expenses.filter(x=>(!s||x.date>=s)&&(!e||x.date<=e)&&(!c||x.category===c)&&(!q||((x.recipient||"")+" "+(x.description||"")+" "+x.category).toLocaleLowerCase("tr-TR").includes(q))).sort((a,b)=>b.date.localeCompare(a.date)),tot=r.reduce((a,x)=>a+(+x.amount||0),0);
+ document.getElementById("payTotal").textContent=money(tot);document.getElementById("payCount").textContent=r.length;
+ document.getElementById("paymentTable").innerHTML=r.map(x=>`<tr><td>${new Date(x.date+"T00:00:00").toLocaleDateString("tr-TR")}</td><td>${escapeHtml(x.category)}</td><td>${escapeHtml(x.recipient||"-")}</td><td>${escapeHtml(x.description||"-")}</td><td class="amount">${money(x.amount)}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">Kayıt bulunamadı.</td></tr>';
+}
+function clearPaymentReport(){["payStart","payEnd","paySearch"].forEach(id=>document.getElementById(id).value="");document.getElementById("payCategory").value="";renderPaymentReport()}
+
+fillMonths();
+document.getElementById("monthlyYear").addEventListener("change",renderMonthlyReport);
+document.getElementById("monthlyMonth").addEventListener("change",renderMonthlyReport);
+document.getElementById("yearlyYear").addEventListener("change",renderYearlyReport);
+render();
+renderDashboard();renderMonthlyReport();renderYearlyReport();fillReportFilters();renderFilters();renderPaymentReport();
+document.getElementById("kasaDate").value=today();
+document.getElementById("kasaDate").addEventListener("change",updateKasaStartFromDate);
+document.getElementById("kasaStart").addEventListener("input",renderKasaPreview);
+document.getElementById("kasaEnd").addEventListener("input",renderKasaPreview);
+updateKasaStartFromDate();
+renderKasa();
+</script>
+</div>
+</body>
+</html>
