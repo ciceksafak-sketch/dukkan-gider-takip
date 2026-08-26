@@ -52,8 +52,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 6px;
 <button class="side-btn" onclick="showView('monthly',this)">📅 Aylık Ciro</button>
 <button class="side-btn" onclick="showView('yearly',this)">📆 Yıllık Ciro</button>
 <button class="side-btn" onclick="showView('incomeExpense',this)">💰 Gelir / Gider</button>
-<button class="side-btn" onclick="showView('expenses',this)">🧾 Nereye / Kime Ödedim?</button>
-<button class="side-btn" onclick="showView('main',this)">📋 Tüm Kayıtlar</button>
+<button class="side-btn" onclick="showView('main',this)">📖 Gider Günlüğü</button>
 </aside>
 <div class="app-content">
 <div id="loginScreen" style="position:fixed;inset:0;background:#111827;color:white;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
@@ -103,9 +102,13 @@ Gelir = Gün sonu kasa + o günün giderleri − gün başlangıç kasası. Gide
 <h2>📅 Kasa Özeti</h2>
 <div class="kasa-grid">
   <div class="kasa-box"><div class="kasa-label">Bugünkü Gelir</div><div class="kasa-value kasa-blue" id="todayIncome">₺0</div></div>
-  <div class="kasa-box"><div class="kasa-label">Bu Hafta Gelir</div><div class="kasa-value" id="weekIncome">₺0</div></div>
-  <div class="kasa-box"><div class="kasa-label">Bu Ay Gelir</div><div class="kasa-value" id="monthIncome">₺0</div></div>
-  <div class="kasa-box"><div class="kasa-label">Toplam Gelir</div><div class="kasa-value" id="allIncome">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Bugünkü Gider</div><div class="kasa-value kasa-red" id="todayExpense">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Bu Hafta Gelir</div><div class="kasa-value kasa-blue" id="weekIncome">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Bu Hafta Gider</div><div class="kasa-value kasa-red" id="weekExpense">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Bu Ay Gelir</div><div class="kasa-value kasa-blue" id="monthIncome">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Bu Ay Gider</div><div class="kasa-value kasa-red" id="monthExpense">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Toplam Gelir</div><div class="kasa-value kasa-blue" id="allIncome">₺0</div></div>
+  <div class="kasa-box"><div class="kasa-label">Toplam Gider</div><div class="kasa-value kasa-red" id="allExpense">₺0</div></div>
 </div>
 </section>
 
@@ -126,7 +129,6 @@ Gelir = Gün sonu kasa + o günün giderleri − gün başlangıç kasası. Gide
 <div class="grid">
 <div><label>Tarih</label><input type="date" id="date"></div>
 <div><label>Gider Adı / Kategori</label><input id="category" placeholder="Örn. Kira / Elektrik / Bakkal"></div>
-<div><label>Nereye / Kime</label><input id="recipient" placeholder="Örn. Ev sahibi / TEDAŞ / Ahmet"></div>
 <div><label>Açıklama</label><input id="description" placeholder="Örn. Ağustos kira"></div>
 <div><label>Tutar (TL)</label><input id="amount" type="number" min="0" step="0.01" placeholder="0"></div>
 </div>
@@ -169,7 +171,7 @@ Gelir = Gün sonu kasa + o günün giderleri − gün başlangıç kasası. Gide
 </section>
 
 <section class="panel">
-<h2>Gider Kayıtları</h2>
+<h2>📖 Gider Günlüğü</h2>
 <div style="overflow:auto"><table><thead><tr><th>Tarih</th><th>Tür</th><th>Açıklama</th><th class="amount">Tutar</th><th></th></tr></thead>
 <tbody id="expenseTable"></tbody></table></div>
 <div id="empty" class="empty">Henüz gider kaydı yok.</div>
@@ -240,8 +242,9 @@ document.getElementById("loginPassword").addEventListener("keydown",e=>{if(e.key
 let expenses=JSON.parse(localStorage.getItem(KEY)||"[]");
 
 let kasaDays=JSON.parse(localStorage.getItem(CASH_KEY)||"[]");
-
-function saveKasa(){localStorage.setItem(CASH_KEY,JSON.stringify(kasaDays))}
+// Güncel telefon yedeği: yalnızca bu uygulama ilk kez açılıyorsa içeri alınır.
+// Mevcut kayıt varsa ASLA üzerine yazılmaz.
+// Kişisel yedek verileri GitHub'a yüklenmez; cihazdaki yerel kayıtlar korunur.\n\nfunction saveKasa(){localStorage.setItem(CASH_KEY,JSON.stringify(kasaDays))}
 
 function expensesForDate(date){
   return expenses.filter(x=>x.date===date).reduce((s,x)=>s+Number(x.amount||0),0);
@@ -355,10 +358,18 @@ function renderKasa(){
   const week=kasaDays.filter(x=>x.date>=weekStart).reduce((s,x)=>s+kasaIncome(x),0);
   const month=kasaDays.filter(x=>x.date.startsWith(ym)).reduce((s,x)=>s+kasaIncome(x),0);
   const all=kasaDays.reduce((s,x)=>s+kasaIncome(x),0);
-  document.getElementById("todayIncome").textContent=money(todayIncomeValue);
-  document.getElementById("weekIncome").textContent=money(week);
-  document.getElementById("monthIncome").textContent=money(month);
-  document.getElementById("allIncome").textContent=money(all);
+  const todayExpense=totalExpenseBetween(t,t);
+  const weekExpense=totalExpenseBetween(weekStart,t);
+  const monthExpense=totalExpenseBetween(ym+"-01",ym+"-31");
+  const allExpense=totalExpenseBetween("","");
+  setText("todayIncome",money(todayIncomeValue));
+  setText("todayExpense",money(todayExpense));
+  setText("weekIncome",money(week));
+  setText("weekExpense",money(weekExpense));
+  setText("monthIncome",money(month));
+  setText("monthExpense",money(monthExpense));
+  setText("allIncome",money(all));
+  setText("allExpense",money(allExpense));
 
   const rows=[...kasaDays].sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById("kasaTable").innerHTML=rows.map(x=>
@@ -379,6 +390,7 @@ function today(){
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 }
 document.getElementById("date").value=today();
+document.getElementById("kasaDate").value=today();
 
 const now=new Date(), thisYear=now.getFullYear(), thisMonth=now.getMonth();
 for(let y=thisYear-3;y<=thisYear+3;y++){
@@ -395,7 +407,7 @@ function addExpense(){
  const description=document.getElementById("description").value.trim();
  const amount=Number(document.getElementById("amount").value);
  if(!date||!category||!amount||amount<0){alert("Tarih, gider adı ve geçerli bir tutar gir.");return}
- expenses.push({id:Date.now(),date,category,recipient,description,amount});
+ expenses.push({id:Date.now(),date,category,description,amount});
  save();clearForm();render();renderKasa();renderKasaPreview();
 }
 
@@ -546,7 +558,7 @@ function changePassword(){
 
 function deleteAll(){
  if(confirm("TÜM gider kayıtları silinecek. Emin misin?")){
-  expenses=[];save();render();renderKasa();renderKasaPreview()
+  expenses=[];save();render();renderDashboard();renderKasa();renderKasaPreview()
  }
 }
 
@@ -571,11 +583,25 @@ function showView(name,btn){
 function totalExpenseBetween(s,e){return expenses.filter(x=>(!s||x.date>=s)&&(!e||x.date<=e)).reduce((a,x)=>a+Number(x.amount||0),0)}
 function totalIncomeBetween(s,e){return kasaDays.filter(x=>(!s||x.date>=s)&&(!e||x.date<=e)).reduce((a,x)=>a+kasaIncome(x),0)}
 function cashIncomeDate(d){const x=kasaDays.find(x=>x.date===d);return x?kasaIncome(x):0}
-function renderDashboard(){
- const t=today(),ym=t.slice(0,7),y=t.slice(0,4),mi=totalIncomeBetween(ym+"-01",ym+"-31"),me=totalExpenseBetween(ym+"-01",ym+"-31");
- document.getElementById("dashToday").textContent=money(cashIncomeDate(t));document.getElementById("dashMonth").textContent=money(mi);document.getElementById("dashYear").textContent=money(totalIncomeBetween(y+"-01-01",y+"-12-31"));document.getElementById("dashExpense").textContent=money(expenses.reduce((a,x)=>a+Number(x.amount||0),0));
- document.getElementById("dashMonthIncome").textContent=money(mi);document.getElementById("dashMonthExpense").textContent=money(me);document.getElementById("dashMonthNet").textContent=money(mi-me);document.getElementById("dashExpenseCount").textContent=expenses.filter(x=>x.date.startsWith(ym)).length;
+function setText(id,value){
+ const el=document.getElementById(id);
+ if(el) el.textContent=value;
 }
+
+function renderDashboard(){
+ const t=today(),ym=t.slice(0,7),y=t.slice(0,4);
+ const mi=totalIncomeBetween(ym+"-01",ym+"-31");
+ const me=totalExpenseBetween(ym+"-01",ym+"-31");
+ setText("dashToday",money(cashIncomeDate(t)));
+ setText("dashMonth",money(mi));
+ setText("dashYear",money(totalIncomeBetween(y+"-01-01",y+"-12-31")));
+ setText("dashExpense",money(totalExpenseBetween("","")));
+ setText("dashMonthIncome",money(mi));
+ setText("dashMonthExpense",money(me));
+ setText("dashMonthNet",money(mi-me));
+ setText("dashExpenseCount",expenses.filter(x=>x.date.startsWith(ym)).length);
+}
+
 function fillYears(){
  const years=new Set([new Date().getFullYear()]);expenses.forEach(x=>years.add(+x.date.slice(0,4)));kasaDays.forEach(x=>years.add(+x.date.slice(0,4)));
  const ys=[...years].sort((a,b)=>b-a);["monthlyYear","yearlyYear"].forEach(id=>{const e=document.getElementById(id),old=e.value;e.innerHTML=ys.map(y=>`<option>${y}</option>`).join("");if(ys.includes(+old))e.value=old});
@@ -597,7 +623,7 @@ function fillReportFilters(){
 function renderFilters(){
  const s=document.getElementById("filterStart").value,e=document.getElementById("filterEnd").value,c=document.getElementById("filterCategory").value,t=document.getElementById("filterType").value,r=[];
  if(t!=="expense")kasaDays.filter(x=>(!s||x.date>=s)&&(!e||x.date<=e)).forEach(x=>r.push({date:x.date,type:"Gelir",cat:"Kasa",desc:"Günlük kasa cirosu",amt:kasaIncome(x)}));
- if(t!=="income")expenses.filter(x=>(!s||x.date>=s)&&(!e||x.date<=e)&&(!c||x.category===c)).forEach(x=>r.push({date:x.date,type:"Gider",cat:x.category,desc:(x.recipient?x.recipient+" — ":"")+(x.description||"-"),amt:+x.amount||0}));
+ if(t!=="income")expenses.filter(x=>(!s||x.date>=s)&&(!e||x.date<=e)&&(!c||x.category===c)).forEach(x=>r.push({date:x.date,type:"Gider",cat:x.category,desc:(x.description||"-"),amt:+x.amount||0}));
  r.sort((a,b)=>b.date.localeCompare(a.date));const i=r.filter(x=>x.type==="Gelir").reduce((a,x)=>a+x.amt,0),g=r.filter(x=>x.type==="Gider").reduce((a,x)=>a+x.amt,0);
  document.getElementById("filteredIncome").textContent=money(i);document.getElementById("filteredExpense").textContent=money(g);document.getElementById("filteredNet").textContent=money(i-g);document.getElementById("filteredCount").textContent=r.length;
  document.getElementById("filterTable").innerHTML=r.map(x=>`<tr><td>${new Date(x.date+"T00:00:00").toLocaleDateString("tr-TR")}</td><td>${x.type}</td><td>${escapeHtml(x.cat)}</td><td>${escapeHtml(x.desc)}</td><td class="amount">${money(x.amt)}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">Kayıt bulunamadı.</td></tr>';
